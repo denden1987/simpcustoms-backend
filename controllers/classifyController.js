@@ -2,13 +2,35 @@ const aiService = require("../services/aiService");
 
 exports.classifyProduct = async (req, res) => {
   try {
-    const { title, description } = req.body;
+    // Accept multiple field name variants (frontend-agnostic)
+    const title =
+      req.body.title ||
+      req.body.product_title ||
+      "";
 
-    if (!title && !description) {
-      return res.status(400).json({ error: "Missing title or description" });
+    const description =
+      req.body.description ||
+      req.body.product_description ||
+      "";
+
+    const additionalDetails =
+      req.body.additionalDetails ||
+      req.body.additional_details ||
+      "";
+
+    // Require at least a description to classify safely
+    if (!description) {
+      return res.status(400).json({
+        error: "Missing product description"
+      });
     }
 
-    const result = await aiService.classifyHSCode(title, description);
+    // Call AI classification logic
+    const result = await aiService.classifyHSCode(
+      title,
+      description,
+      additionalDetails
+    );
 
     return res.json({
       success: true,
@@ -19,6 +41,8 @@ exports.classifyProduct = async (req, res) => {
 
   } catch (error) {
     console.error("Controller error:", error);
-    res.status(500).json({ error: "Server error" });
+    return res.status(500).json({
+      error: "Server error"
+    });
   }
 };
