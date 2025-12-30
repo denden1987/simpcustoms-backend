@@ -1,48 +1,25 @@
-const aiService = require("../services/aiService");
+const { classifyHSCode } = require("../services/aiService");
 
-exports.classifyProduct = async (req, res) => {
+exports.classify = async (req, res) => {
   try {
-    // Accept multiple field name variants (frontend-agnostic)
-    const title =
-      req.body.title ||
-      req.body.product_title ||
-      "";
+    const { product_description, additional_details } = req.body;
 
-    const description =
-      req.body.description ||
-      req.body.product_description ||
-      "";
-
-    const additionalDetails =
-      req.body.additionalDetails ||
-      req.body.additional_details ||
-      "";
-
-    // Require at least a description to classify safely
-    if (!description) {
+    if (!product_description) {
       return res.status(400).json({
-        error: "Missing product description"
+        error: "product_description is required"
       });
     }
 
-    // Call AI classification logic
-    const result = await aiService.classifyHSCode(
-      title,
-      description,
-      additionalDetails
+    const result = await classifyHSCode(
+      product_description,
+      additional_details || ""
     );
 
-    return res.json({
-      success: true,
-      hs_code: result.hs_code,
-      confidence: result.confidence,
-      reasoning: result.reasoning
-    });
-
+    return res.json(result);
   } catch (error) {
-    console.error("Controller error:", error);
+    console.error("HS classification error:", error);
     return res.status(500).json({
-      error: "Server error"
+      error: "Failed to classify product"
     });
   }
 };
