@@ -2,12 +2,17 @@ const express = require("express");
 const router = express.Router();
 
 const classifyController = require("../controllers/classifyController");
+const { classifyLimiter } = require("../middleware/rateLimit");
 
-// 🔴 TEMPORARY: auth + plan checks DISABLED for testing
-// This allows us to confirm OpenAI + payload + controller logic works
-
+/**
+ * HS Code classification endpoint
+ * - UI gated to paid users
+ * - Rate limited for backend protection
+ * - Auth temporarily disabled (handled at UI level)
+ */
 router.post(
   "/",
+  classifyLimiter,
   classifyController.classifyProduct
 );
 
