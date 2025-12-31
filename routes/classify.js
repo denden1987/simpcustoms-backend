@@ -1,14 +1,9 @@
-// routes/classify.js
 const express = require("express");
+const rateLimit = require("../middleware/rateLimit");
+const { classifyHSCode } = require("../controllers/classifyController");
+
 const router = express.Router();
 
-const { classifyHSCode } = require("../controllers/classifyController");
-const { classifyLimiter } = require("../middleware/rateLimit");
-
-router.post(
-  "/",
-  classifyLimiter,   // ✅ this IS now a function
-  classifyHSCode     // ✅ controller function
-);
+router.post("/", rateLimit, classifyHSCode);
 
 module.exports = router;

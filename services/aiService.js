@@ -1,38 +1,36 @@
 const OpenAI = require("openai");
 
-const client = new OpenAI({
+const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-exports.classifyHSCode = async ({ product_description, additional_details }) => {
+/**
+ * Classify product and suggest HS code
+ */
+async function classifyProduct(product_description, additional_details = "") {
   const prompt = `
 You are a customs classification expert.
-
-Classify the following product and return:
-- HS code (6–10 digits if confident)
-- Short explanation
 
 Product description:
 ${product_description}
 
 Additional details:
 ${additional_details}
+
+Return:
+- HS Code (6 digits)
+- Short explanation
 `;
 
-  const response = await client.chat.completions.create({
+  const response = await openai.chat.completions.create({
     model: "gpt-4o-mini",
-    messages: [
-      {
-        role: "system",
-        content: "You are an expert in HS code classification.",
-      },
-      {
-        role: "user",
-        content: prompt,
-      },
-    ],
+    messages: [{ role: "user", content: prompt }],
     temperature: 0.2,
   });
 
   return response.choices[0].message.content;
+}
+
+module.exports = {
+  classifyProduct,
 };

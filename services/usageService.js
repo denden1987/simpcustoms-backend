@@ -1,15 +1,19 @@
 const { supabase } = require("../supabaseClient");
 
-exports.recordHsLookup = async (ipAddress) => {
-  try {
-    await supabase.from("hs_code_usage").insert([
+async function logHSCodeUsage({ userId, ipAddress }) {
+  const { error } = await supabase
+    .from("hs_code_usage")
+    .insert([
       {
+        user_id: userId || null,
         ip_address: ipAddress,
-        endpoint: "hs_classify",
-      },
+        created_at: new Date()
+      }
     ]);
-  } catch (err) {
-    // IMPORTANT: never block the user because of usage logging
-    console.error("Failed to record HS usage:", err.message);
+
+  if (error) {
+    console.error("Failed to log HS usage:", error);
   }
-};
+}
+
+module.exports = { logHSCodeUsage };

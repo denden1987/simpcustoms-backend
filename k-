@@ -1,0 +1,65 @@
+[33mcommit 47818b3eea9045cdf581a3c1c71117f5dc62bc0a[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m
+Author: Brendan <support@simpcustoms.com>
+Date:   Sun Dec 21 21:24:52 2025 +0000
+
+    Remove secrets and temporary files from repo
+
+ .gitignore                    |   5 [32m+++++[m
+ .txt                          |   0
+ Supeerbase.txt                |   1 [31m-[m
+ eccomcustomspassword.txt      |   1 [31m-[m
+ tmp/certificate_of_origin.pdf | Bin [31m736821[m -> [32m0[m bytes
+ tmp/credit_note.pdf           | Bin [31m736531[m -> [32m0[m bytes
+ tmp/invoice.pdf               | Bin [31m736391[m -> [32m0[m bytes
+ tmp/packing_list.pdf          | Bin [31m736403[m -> [32m0[m bytes
+ tmp/pro_forma.pdf             | Bin [31m736461[m -> [32m0[m bytes
+ 9 files changed, 5 insertions(+), 2 deletions(-)
+
+[33mcommit dfe2463671f84e3f0728a0f52375995f610cec8e[m
+Author: Brendan <support@simpcustoms.com>
+Date:   Sun Dec 21 21:19:25 2025 +0000
+
+    Initial backend deploy
+
+ .txt                                 |    0
+ Supeerbase.txt                       |    1 [32m+[m
+ assets/logo.png                      |  Bin [31m0[m -> [32m788106[m bytes
+ config/planLimits.js                 |   27 [32m+[m
+ controllers/certificateOfOrigin.js   |  178 [32m+++[m
+ controllers/classifyController.js    |   24 [32m+[m
+ controllers/creditNote.js            |  157 [32m+++[m
+ controllers/documentController.js    |  181 [32m+++[m
+ controllers/export.js                |   96 [32m++[m
+ controllers/packingListController.js |  178 [32m+++[m
+ controllers/proFormaController.js    |  180 [32m+++[m
+ eccomcustomspassword.txt             |    1 [32m+[m
+ getToken.js                          |   22 [32m+[m
+ middleware/auth.js                   |   36 [32m+[m
+ middleware/plan.js                   |   47 [32m+[m
+ middleware/profileLimit.js           |   46 [32m+[m
+ middleware/requirePaidPlan.js        |   22 [32m+[m
+ middleware/usage.js                  |   59 [32m+[m
+ package-lock.json                    | 2335 [32m++++++++++++++++++++++++++++++++++[m
+ package.json                         |   24 [32m+[m
+ routes/billing.js                    |  108 [32m++[m
+ routes/certificateOfOrigin.js        |    8 [32m+[m
+ routes/classify.js                   |   38 [32m+[m
+ routes/creditNote.js                 |    8 [32m+[m
+ routes/documents.js                  |   86 [32m++[m
+ routes/export.js                     |    9 [32m+[m
+ routes/logo.js                       |   50 [32m+[m
+ routes/packingList.js                |    8 [32m+[m
+ routes/proForma.js                   |    7 [32m+[m
+ routes/profiles.js                   |   55 [32m+[m
+ routes/testDbRoute.js                |   31 [32m+[m
+ routes/testRoute.js                  |   36 [32m+[m
+ server.js                            |  130 [32m++[m
+ services/aiService.js                |   52 [32m+[m
+ services/stripe.js                   |    7 [32m+[m
+ tmp/certificate_of_origin.pdf        |  Bin [31m0[m -> [32m736821[m bytes
+ tmp/credit_note.pdf                  |  Bin [31m0[m -> [32m736531[m bytes
+ tmp/invoice.pdf                      |  Bin [31m0[m -> [32m736391[m bytes
+ tmp/packing_list.pdf                 |  Bin [31m0[m -> [32m736403[m bytes
+ tmp/pro_forma.pdf                    |  Bin [31m0[m -> [32m736461[m bytes
+ utils/supabaseClient.js              |    9 [32m+[m
+ 41 files changed, 4256 insertions(+)
