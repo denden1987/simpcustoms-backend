@@ -1,29 +1,34 @@
-const { classifyProduct } = require("../services/aiService");
+const { classifyHSCode } = require("../services/aiService");
 
-async function classifyHSCode(req, res) {
+exports.classifyProduct = async (req, res) => {
   try {
+    console.log("🔵 /api/classify called");
+    console.log("🔵 Request body:", req.body);
+
     const { product_description, additional_details } = req.body;
 
     if (!product_description) {
-      return res.status(400).json({
-        error: "Product description is required",
-      });
+      console.log("🔴 Missing product_description");
+      return res.status(400).json({ error: "product_description is required" });
     }
 
-    const result = await classifyProduct({
+    console.log("🟡 Calling AI service...");
+
+    const result = await classifyHSCode(
       product_description,
-      additional_details: additional_details || "",
-    });
+      additional_details || ""
+    );
+
+    console.log("🟢 AI result:", result);
 
     return res.json(result);
-  } catch (error) {
-    console.error("HS Code classification error:", error);
+  } catch (err) {
+    console.error("🔥 CLASSIFY ERROR:", err);
+    console.error("🔥 STACK:", err.stack);
+
     return res.status(500).json({
-      error: "Unable to classify product",
+      error: "Classification failed",
+      details: err.message,
     });
   }
-}
-
-module.exports = {
-  classifyHSCode,
 };
