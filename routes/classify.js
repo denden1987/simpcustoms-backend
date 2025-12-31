@@ -1,19 +1,9 @@
 const express = require("express");
 const router = express.Router();
 
-const classifyController = require("../controllers/classifyController");
-const { classifyLimiter } = require("../middleware/rateLimit");
+const { classifyHSCode } = require("../controllers/classifyController");
 
-/**
- * HS Code classification endpoint
- * - UI gated to paid users
- * - Rate limited for backend protection
- * - Auth temporarily disabled (handled at UI level)
- */
-router.post(
-  "/",
-  classifyLimiter,
-  classifyController.classifyProduct
-);
+// 🔓 TEMP: no auth, no rate limit — diagnostics only
+router.post("/", classifyHSCode);
 
 module.exports = router;
