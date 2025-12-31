@@ -1,9 +1,14 @@
+// routes/classify.js
 const express = require("express");
 const router = express.Router();
 
 const { classifyHSCode } = require("../controllers/classifyController");
+const { classifyLimiter } = require("../middleware/rateLimit");
 
-// 🔓 TEMP: no auth, no rate limit (debugging only)
-router.post("/", classifyHSCode);
+router.post(
+  "/",
+  classifyLimiter,   // ✅ this IS now a function
+  classifyHSCode     // ✅ controller function
+);
 
 module.exports = router;

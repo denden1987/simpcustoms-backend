@@ -1,34 +1,37 @@
-const { classifyHSCode } = require("../services/aiService");
+// controllers/classifyController.js
+const { classifyProduct } = require("../services/aiService");
+const { recordHSCodeUsage } = require("../services/usageService");
 
-exports.classifyProduct = async (req, res) => {
+async function classifyHSCode(req, res) {
   try {
-    console.log("🔵 /api/classify called");
-    console.log("🔵 Request body:", req.body);
-
-    const { product_description, additional_details } = req.body;
+    const { product_description, additional_details = "" } = req.body;
 
     if (!product_description) {
-      console.log("🔴 Missing product_description");
-      return res.status(400).json({ error: "product_description is required" });
+      return res.status(400).json({
+        error: "product_description is required"
+      });
     }
 
-    console.log("🟡 Calling AI service...");
-
-    const result = await classifyHSCode(
+    const result = await classifyProduct(
       product_description,
-      additional_details || ""
+      additional_details
     );
 
-    console.log("🟢 AI result:", result);
+    // fire-and-forget usage tracking
+    recordHSCodeUsage(req).catch(() => {});
 
-    return res.json(result);
+    res.json({
+      success: true,
+      result
+    });
   } catch (err) {
-    console.error("🔥 CLASSIFY ERROR:", err);
-    console.error("🔥 STACK:", err.stack);
-
-    return res.status(500).json({
-      error: "Classification failed",
-      details: err.message,
+    console.error("HS classification error:", err);
+    res.status(500).json({
+      error: "Unable to classify product"
     });
   }
+}
+
+module.exports = {
+  classifyHSCode
 };
