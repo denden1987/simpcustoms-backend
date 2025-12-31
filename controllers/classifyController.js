@@ -1,25 +1,38 @@
-const { classifyHSCode } = require("../services/aiService");
+const aiService = require("../services/aiService");
+const { recordHsLookup } = require("../services/usageService");
 
-exports.classify = async (req, res) => {
+exports.classifyProduct = async (req, res) => {
   try {
-    const { product_description, additional_details } = req.body;
+    const { product_description, additional_details = "" } = req.body;
 
     if (!product_description) {
       return res.status(400).json({
-        error: "product_description is required"
+        error: "product_description is required",
       });
     }
 
-    const result = await classifyHSCode(
-      product_description,
-      additional_details || ""
-    );
+    // 🔍 Capture IP (works behind Railway proxy)
+    const ipAddress =
+      req.headers["x-forwarded-for"]?.split(",")[0] ||
+      req.socket.remoteAddress;
 
-    return res.json(result);
-  } catch (error) {
-    console.error("HS classification error:", error);
+    // 🔐 Record usage (non-blocking)
+    recordHsLookup(ipAddress);
+
+    const result = await aiService.classifyHSCode({
+      product_description,
+      additional_details,
+    });
+
+    return res.status(200).json({
+      success: true,
+      classification: result,
+    });
+  } catch (err) {
+    console.error("HS classification error:", err);
+
     return res.status(500).json({
-      error: "Failed to classify product"
+      error: "Internal server error during HS classification",
     });
   }
 };
