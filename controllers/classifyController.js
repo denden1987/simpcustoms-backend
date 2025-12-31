@@ -1,12 +1,12 @@
 const { classifyProduct } = require("../services/aiService");
 
-async function classifyHSCode(req, res) {
+exports.classifyHSCode = async (req, res) => {
   try {
     const { product_description, additional_details } = req.body;
 
     if (!product_description) {
       return res.status(400).json({
-        error: "Product description is required",
+        error: "product_description is required",
       });
     }
 
@@ -15,18 +15,17 @@ async function classifyHSCode(req, res) {
       additional_details || ""
     );
 
+    // 🔑 NORMALISED RESPONSE (frontend-safe)
     res.json({
-      success: true,
-      result,
+      hsCode: result.hsCode || result.code || null,
+      confidence: result.confidence || "Medium",
+      explanation: result.explanation || result.reason || "",
+      dutyRate: result.dutyRate || null,
     });
   } catch (error) {
     console.error("HS classification error:", error);
     res.status(500).json({
-      error: "Unable to classify the product",
+      error: "Unable to classify product",
     });
   }
-}
-
-module.exports = {
-  classifyHSCode,
 };
