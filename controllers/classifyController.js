@@ -1,6 +1,5 @@
 const { classifyProduct } = require("../services/aiService");
 const { supabase } = require("../supabaseClient");
-const jwt = require("jsonwebtoken");
 
 // 🔢 Monthly HS Code limits by plan
 const HS_CODE_LIMITS = {
@@ -19,21 +18,27 @@ exports.classifyHSCode = async (req, res) => {
       });
     }
 
-    // 🔐 Extract user ID from JWT
+    // 🔐 Extract access token
     const authHeader = req.headers.authorization;
-    if (!authHeader) {
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const token = authHeader.replace("Bearer ", "");
-    const decoded = jwt.decode(token);
+    const accessToken = authHeader.replace("Bearer ", "");
 
-    const userId = decoded?.sub;
-    if (!userId) {
-      return res.status(401).json({ error: "Invalid user token" });
+    // 🔐 Ask Supabase who this user is
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser(accessToken);
+
+    if (userError || !user) {
+      return res.status(401).json({ error: "Invalid user session" });
     }
 
-    // 📦 Fetch active subscription from DB
+    const userId = user.id;
+
+    // 📦 Fetch active subscription
     const { data: subscription, error: subError } = await supabase
       .from("subscriptions")
       .select("plan, status")
