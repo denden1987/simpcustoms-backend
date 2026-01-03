@@ -1,72 +1,39 @@
 const { classifyProduct } = require("../services/aiService");
 const { supabase } = require("../supabaseClient");
 
-// 🔢 Monthly HS Code limits by plan
-const HS_CODE_LIMITS = {
-  starter: 20,
-  business: 100,
-  professional: 300,
-};
+// 🔢 Monthly HS Code limit (Business plan for now)
+const MONTHLY_HS_CODE_LIMIT = 100;
 
 exports.classifyHSCode = async (req, res) => {
   try {
     const { product_description, additional_details } = req.body;
 
+    // 🔒 Basic validation
     if (!product_description) {
       return res.status(400).json({
         error: "product_description is required",
       });
     }
 
-    // 🔐 Base44 user identity
+    // 🔐 User identity provided by Base44
     const userEmail = req.headers["x-user-email"];
-
     if (!userEmail) {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    // 🔍 Look up user in Supabase Auth (ADMIN, v2-compatible)
-    const {
-      data: userList,
-      error: listError,
-    } = await supabase.auth.admin.listUsers({
-      page: 1,
-      perPage: 1,
-      email: userEmail,
-    });
-
-    if (listError || !userList?.users?.length) {
-      console.error("Auth user lookup failed:", listError);
-      return res.status(403).json({
-        error: "Authenticated user not found",
+    // 🔍 Resolve user in Supabase Auth (admin)
+    const { data: users, error: userError } =
+      await supabase.auth.admin.listUsers({
+        page: 1,
+        perPage: 1,
+        email: userEmail,
       });
+
+    if (userError || !users?.users?.length) {
+      return res.status(403).json({ error: "User not found" });
     }
 
-    const authUser = userList.users[0];
-    const userId = authUser.id;
-
-    // 📦 Fetch active subscription
-    const { data: subscription, error: subError } = await supabase
-      .from("subscriptions")
-      .select("plan, status")
-      .eq("user_id", userId)
-      .eq("status", "active")
-      .single();
-
-    if (subError || !subscription) {
-      return res.status(403).json({
-        error: "HS Code lookup is not available on your current plan.",
-      });
-    }
-
-    const plan = subscription.plan?.toLowerCase();
-    const monthlyLimit = HS_CODE_LIMITS[plan];
-
-    if (!monthlyLimit) {
-      return res.status(403).json({
-        error: "HS Code lookup is not available on your current plan.",
-      });
-    }
+    const userId = users.users[0].id;
 
     // 📅 Start of current month (UTC)
     const startOfMonth = new Date();
@@ -81,45 +48,46 @@ exports.classifyHSCode = async (req, res) => {
       .gte("created_at", startOfMonth.toISOString());
 
     if (countError) {
-      console.error("Usage count failed:", countError.message);
+      console.error("HS code usage count failed:", countError.message);
       return res.status(500).json({
         error: "Unable to verify HS Code usage",
       });
     }
 
-    // ⛔ Limit reached
-    if (count >= monthlyLimit) {
+    // ⛔ Limit reached → block BEFORE OpenAI
+    if (count >= MONTHLY_HS_CODE_LIMIT) {
       return res.status(429).json({
         error:
-          "You have reached your monthly HS Code lookup limit. Please upgrade your plan to continue.",
+          "You have reached your monthly HS Code lookup limit. Please upgrade to continue.",
       });
     }
 
-    // 🤖 Call AI
+    // 🤖 Call AI (safe to proceed)
     const result = await classifyProduct(
       product_description,
       additional_details || ""
     );
 
-    // 📊 Log usage (non-blocking)
+    // 📊 Log usage (non-blocking, cost-safe)
     try {
       await supabase.from("hs_code_usage").insert([
         {
           user_id: userId,
           ip_address: req.ip,
           endpoint: "/api/classify",
-          plan,
+          plan: "business",
         },
       ]);
     } catch (logError) {
-      console.error("Usage logging failed:", logError.message);
+      console.error("HS code usage logging failed:", logError.message);
     }
 
+    // ✅ Response
     return res.json({
-      hsCode: result.hsCode || result.code || null,
+      hsCode: result.hsCode || null,
       confidence: result.confidence || "Medium",
-      explanation: result.explanation || result.reason || "",
-      dutyRate: result.dutyRate || null,
+      explanation: result.explanation || "",
+      dutyRate: null,
     });
   } catch (error) {
     console.error("HS classification error:", error);
