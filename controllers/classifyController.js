@@ -1,4 +1,5 @@
 const { classifyProduct } = require("../services/aiService");
+const supabase = require("../services/supabaseClient"); // ✅ existing client
 
 exports.classifyHSCode = async (req, res) => {
   try {
@@ -14,6 +15,25 @@ exports.classifyHSCode = async (req, res) => {
       product_description,
       additional_details || ""
     );
+
+    // 🔽 START HS CODE USAGE LOGGING (NON-BLOCKING)
+    try {
+      await supabase
+        .from("hs_code_usage")
+        .insert([
+          {
+            user_id: req.user.id,
+            ip_address: req.ip,
+            plan: req.user?.plan || null,
+          },
+        ]);
+    } catch (logError) {
+      console.error(
+        "HS code usage logging failed:",
+        logError.message
+      );
+    }
+    // 🔼 END HS CODE USAGE LOGGING
 
     // 🔑 NORMALISED RESPONSE (frontend-safe)
     res.json({
