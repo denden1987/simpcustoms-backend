@@ -1,7 +1,7 @@
 const { classifyProduct } = require("../services/aiService");
 const { supabase } = require("../supabaseClient");
 
-// 🔢 HS Code monthly limits by plan
+// 🔢 HS Code monthly limits by plan (NORMALISED)
 const HS_CODE_LIMITS = {
   starter: 20,
   business: 100,
@@ -12,7 +12,6 @@ exports.classifyHSCode = async (req, res) => {
   try {
     const { product_description, additional_details } = req.body;
 
-    // 🔒 Validation
     if (!product_description) {
       return res.status(400).json({
         error: "product_description is required",
@@ -20,9 +19,12 @@ exports.classifyHSCode = async (req, res) => {
     }
 
     const userId = req.user?.id;
-    const plan = req.user?.plan;
+    const rawPlan = req.user?.plan;
 
-    // 🚫 Free users = no HS Code access
+    // 🔒 Normalise plan (VERY IMPORTANT)
+    const plan = rawPlan ? rawPlan.toLowerCase() : null;
+
+    // 🚫 Free or unknown plans blocked
     if (!plan || !HS_CODE_LIMITS[plan]) {
       return res.status(403).json({
         error: "HS Code lookup is not available on your current plan.",
@@ -50,7 +52,7 @@ exports.classifyHSCode = async (req, res) => {
       });
     }
 
-    // ⛔ Limit reached → block BEFORE OpenAI
+    // ⛔ Limit reached
     if (count >= monthlyLimit) {
       return res.status(429).json({
         error:
@@ -58,13 +60,13 @@ exports.classifyHSCode = async (req, res) => {
       });
     }
 
-    // 🤖 Call AI (safe to proceed)
+    // 🤖 Call AI
     const result = await classifyProduct(
       product_description,
       additional_details || ""
     );
 
-    // 📊 Log successful usage (non-blocking)
+    // 📊 Log usage (non-blocking)
     try {
       await supabase.from("hs_code_usage").insert([
         {
@@ -78,7 +80,6 @@ exports.classifyHSCode = async (req, res) => {
       console.error("HS code usage logging failed:", logError.message);
     }
 
-    // 🔑 Normalised response
     return res.json({
       hsCode: result.hsCode || result.code || null,
       confidence: result.confidence || "Medium",
