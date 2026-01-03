@@ -18,28 +18,24 @@ exports.classifyHSCode = async (req, res) => {
       additional_details || ""
     );
 
-    // 🧪 HS CODE USAGE LOGGING — DEBUG MODE
+    // 📊 HS CODE USAGE LOGGING (PRODUCTION, NON-BLOCKING)
     try {
-      const payload = {
-        user_id: req.user?.id || null,
-        ip_address: req.ip,
-        endpoint: "/api/classify",
-        plan: req.user?.plan || null,
-      };
-
-      console.log("HS CODE USAGE PAYLOAD:", payload);
-
-      const { data, error } = await supabase
+      await supabase
         .from("hs_code_usage")
-        .insert([payload])
-        .select();
-
-      console.log("HS CODE USAGE INSERT RESULT:", { data, error });
+        .insert([
+          {
+            user_id: req.user?.id || null,
+            ip_address: req.ip,
+            endpoint: "/api/classify",
+            plan: req.user?.plan || null,
+          },
+        ]);
     } catch (logError) {
-      console.error("HS code usage logging threw error:", logError);
+      // Logging must NEVER affect paid usage
+      console.error("HS code usage logging failed:", logError.message);
     }
 
-    // 🔑 Normalised response
+    // 🔑 Normalised response (frontend-safe)
     return res.json({
       hsCode: result.hsCode || result.code || null,
       confidence: result.confidence || "Medium",
