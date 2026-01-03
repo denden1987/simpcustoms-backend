@@ -1,5 +1,5 @@
 const { classifyProduct } = require("../services/aiService");
-const { supabase } = require("../services/supabaseClient");
+const { supabase } = require("../supabaseClient");
 
 exports.classifyHSCode = async (req, res) => {
   try {
