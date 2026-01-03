@@ -2,7 +2,7 @@ const { classifyProduct } = require("../services/aiService");
 const { supabase } = require("../supabaseClient");
 
 // 🔢 Monthly HS Code limit
-const MONTHLY_HS_CODE_LIMIT = 100;
+const MONTHLY_HS_CODE_LIMIT = 5;
 const WARNING_THRESHOLD = Math.floor(MONTHLY_HS_CODE_LIMIT * 0.8); // 80%
 
 exports.classifyHSCode = async (req, res) => {
