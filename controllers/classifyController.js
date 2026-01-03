@@ -1,7 +1,8 @@
 const { classifyProduct } = require("../services/aiService");
 const { supabase } = require("../supabaseClient");
+const jwt = require("jsonwebtoken");
 
-// 🔢 HS Code monthly limits (internal keys)
+// 🔢 Monthly HS Code limits by plan
 const HS_CODE_LIMITS = {
   starter: 20,
   business: 100,
@@ -18,42 +19,49 @@ exports.classifyHSCode = async (req, res) => {
       });
     }
 
-    // 🧪 DEBUG — LOG USER OBJECT (CRITICAL)
-    console.log("REQ.USER DEBUG:", JSON.stringify(req.user, null, 2));
+    // 🔐 Extract user ID from JWT
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
 
-    const userId = req.user?.id;
+    const token = authHeader.replace("Bearer ", "");
+    const decoded = jwt.decode(token);
 
-    // Try multiple possible locations for plan
-    const rawPlan =
-      req.user?.plan ||
-      req.user?.subscription?.plan ||
-      req.user?.subscription_plan ||
-      null;
+    const userId = decoded?.sub;
+    if (!userId) {
+      return res.status(401).json({ error: "Invalid user token" });
+    }
 
-    console.log("RAW PLAN VALUE:", rawPlan);
+    // 📦 Fetch active subscription from DB
+    const { data: subscription, error: subError } = await supabase
+      .from("subscriptions")
+      .select("plan, status")
+      .eq("user_id", userId)
+      .eq("status", "active")
+      .single();
 
-    // Normalise plan string
-    const plan = rawPlan
-      ? String(rawPlan).toLowerCase().replace(/\s+/g, "")
-      : null;
-
-    console.log("NORMALISED PLAN:", plan);
-
-    // 🚫 Block free / unknown plans
-    if (!plan || !HS_CODE_LIMITS[plan]) {
+    if (subError || !subscription) {
       return res.status(403).json({
         error: "HS Code lookup is not available on your current plan.",
       });
     }
 
+    const plan = subscription.plan?.toLowerCase();
     const monthlyLimit = HS_CODE_LIMITS[plan];
 
-    // 📅 Start of month (UTC)
+    if (!monthlyLimit) {
+      return res.status(403).json({
+        error: "HS Code lookup is not available on your current plan.",
+      });
+    }
+
+    // 📅 Start of current month (UTC)
     const startOfMonth = new Date();
     startOfMonth.setUTCDate(1);
     startOfMonth.setUTCHours(0, 0, 0, 0);
 
-    // 🔍 Count usage
+    // 🔍 Count HS Code usage
     const { count, error: countError } = await supabase
       .from("hs_code_usage")
       .select("*", { count: "exact", head: true })
@@ -67,6 +75,7 @@ exports.classifyHSCode = async (req, res) => {
       });
     }
 
+    // ⛔ Limit reached
     if (count >= monthlyLimit) {
       return res.status(429).json({
         error:
@@ -80,7 +89,7 @@ exports.classifyHSCode = async (req, res) => {
       additional_details || ""
     );
 
-    // 📊 Log usage
+    // 📊 Log usage (non-blocking)
     try {
       await supabase.from("hs_code_usage").insert([
         {
