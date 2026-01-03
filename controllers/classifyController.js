@@ -1,7 +1,7 @@
 const { classifyProduct } = require("../services/aiService");
 const { supabase } = require("../supabaseClient");
 
-// 🔢 HS Code monthly limits by plan (NORMALISED)
+// 🔢 HS Code monthly limits (internal keys)
 const HS_CODE_LIMITS = {
   starter: 20,
   business: 100,
@@ -18,13 +18,28 @@ exports.classifyHSCode = async (req, res) => {
       });
     }
 
+    // 🧪 DEBUG — LOG USER OBJECT (CRITICAL)
+    console.log("REQ.USER DEBUG:", JSON.stringify(req.user, null, 2));
+
     const userId = req.user?.id;
-    const rawPlan = req.user?.plan;
 
-    // 🔒 Normalise plan (VERY IMPORTANT)
-    const plan = rawPlan ? rawPlan.toLowerCase() : null;
+    // Try multiple possible locations for plan
+    const rawPlan =
+      req.user?.plan ||
+      req.user?.subscription?.plan ||
+      req.user?.subscription_plan ||
+      null;
 
-    // 🚫 Free or unknown plans blocked
+    console.log("RAW PLAN VALUE:", rawPlan);
+
+    // Normalise plan string
+    const plan = rawPlan
+      ? String(rawPlan).toLowerCase().replace(/\s+/g, "")
+      : null;
+
+    console.log("NORMALISED PLAN:", plan);
+
+    // 🚫 Block free / unknown plans
     if (!plan || !HS_CODE_LIMITS[plan]) {
       return res.status(403).json({
         error: "HS Code lookup is not available on your current plan.",
@@ -33,12 +48,12 @@ exports.classifyHSCode = async (req, res) => {
 
     const monthlyLimit = HS_CODE_LIMITS[plan];
 
-    // 📅 Start of current month (UTC)
+    // 📅 Start of month (UTC)
     const startOfMonth = new Date();
     startOfMonth.setUTCDate(1);
     startOfMonth.setUTCHours(0, 0, 0, 0);
 
-    // 🔍 Count HS Code usage this month
+    // 🔍 Count usage
     const { count, error: countError } = await supabase
       .from("hs_code_usage")
       .select("*", { count: "exact", head: true })
@@ -46,13 +61,12 @@ exports.classifyHSCode = async (req, res) => {
       .gte("created_at", startOfMonth.toISOString());
 
     if (countError) {
-      console.error("HS code usage count failed:", countError.message);
+      console.error("Usage count failed:", countError.message);
       return res.status(500).json({
         error: "Unable to verify HS Code usage",
       });
     }
 
-    // ⛔ Limit reached
     if (count >= monthlyLimit) {
       return res.status(429).json({
         error:
@@ -66,7 +80,7 @@ exports.classifyHSCode = async (req, res) => {
       additional_details || ""
     );
 
-    // 📊 Log usage (non-blocking)
+    // 📊 Log usage
     try {
       await supabase.from("hs_code_usage").insert([
         {
@@ -77,7 +91,7 @@ exports.classifyHSCode = async (req, res) => {
         },
       ]);
     } catch (logError) {
-      console.error("HS code usage logging failed:", logError.message);
+      console.error("Usage logging failed:", logError.message);
     }
 
     return res.json({
