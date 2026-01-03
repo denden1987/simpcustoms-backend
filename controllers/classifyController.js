@@ -5,38 +5,42 @@ exports.classifyHSCode = async (req, res) => {
   try {
     const { product_description, additional_details } = req.body;
 
+    // 🔒 Validation
     if (!product_description) {
       return res.status(400).json({
         error: "product_description is required",
       });
     }
 
+    // 🤖 Call AI service
     const result = await classifyProduct(
       product_description,
       additional_details || ""
     );
 
-    // 🔽 START HS CODE USAGE LOGGING (NON-BLOCKING)
+    // 🧪 HS CODE USAGE LOGGING — DEBUG MODE
     try {
-      await supabase
-        .from("hs_code_usage")
-        .insert([
-          {
-            user_id: req.user.id,
-            ip_address: req.ip,
-            plan: req.user?.plan || null,
-          },
-        ]);
-    } catch (logError) {
-      console.error(
-        "HS code usage logging failed:",
-        logError.message
-      );
-    }
-    // 🔼 END HS CODE USAGE LOGGING
+      const payload = {
+        user_id: req.user?.id || null,
+        ip_address: req.ip,
+        endpoint: "/api/classify",
+        plan: req.user?.plan || null,
+      };
 
-    // 🔑 NORMALISED RESPONSE (frontend-safe)
-    res.json({
+      console.log("HS CODE USAGE PAYLOAD:", payload);
+
+      const { data, error } = await supabase
+        .from("hs_code_usage")
+        .insert([payload])
+        .select();
+
+      console.log("HS CODE USAGE INSERT RESULT:", { data, error });
+    } catch (logError) {
+      console.error("HS code usage logging threw error:", logError);
+    }
+
+    // 🔑 Normalised response
+    return res.json({
       hsCode: result.hsCode || result.code || null,
       confidence: result.confidence || "Medium",
       explanation: result.explanation || result.reason || "",
@@ -44,7 +48,7 @@ exports.classifyHSCode = async (req, res) => {
     });
   } catch (error) {
     console.error("HS classification error:", error);
-    res.status(500).json({
+    return res.status(500).json({
       error: "Unable to classify product",
     });
   }
