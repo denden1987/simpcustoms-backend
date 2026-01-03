@@ -1,6 +1,7 @@
 const { classifyProduct } = require("../services/aiService");
 const { supabase } = require("../supabaseClient");
 
+// 🔢 Monthly HS Code limits by plan
 const HS_CODE_LIMITS = {
   starter: 20,
   business: 100,
@@ -17,75 +18,75 @@ exports.classifyHSCode = async (req, res) => {
       });
     }
 
+    // 🔐 Base44-provided user identity
     const userEmail = req.headers["x-user-email"];
-    console.log("USER EMAIL HEADER:", userEmail);
 
     if (!userEmail) {
-      return res.status(401).json({ error: "Missing user email" });
+      return res.status(401).json({ error: "Unauthorized" });
     }
 
-    // 🔍 Look up user
-    const { data: user, error: userError } = await supabase
-      .from("users")
-      .select("id, email")
-      .eq("email", userEmail)
-      .maybeSingle();
+    // 🔍 Look up user in Supabase Auth (ADMIN)
+    const {
+      data: authUser,
+      error: authError,
+    } = await supabase.auth.admin.getUserByEmail(userEmail);
 
-    console.log("USER QUERY RESULT:", { user, userError });
-
-    if (!user) {
+    if (authError || !authUser?.user) {
+      console.error("Auth user lookup failed:", authError);
       return res.status(403).json({
-        error: "User record not found",
+        error: "Authenticated user not found",
       });
     }
 
-    const userId = user.id;
+    const userId = authUser.user.id;
 
-    // 🔍 Look up subscription
+    // 📦 Fetch active subscription
     const { data: subscription, error: subError } = await supabase
       .from("subscriptions")
       .select("plan, status")
       .eq("user_id", userId)
-      .maybeSingle();
+      .eq("status", "active")
+      .single();
 
-    console.log("SUBSCRIPTION QUERY RESULT:", {
-      subscription,
-      subError,
-    });
-
-    if (!subscription || subscription.status !== "active") {
+    if (subError || !subscription) {
       return res.status(403).json({
-        error: "No active subscription found",
+        error: "HS Code lookup is not available on your current plan.",
       });
     }
 
     const plan = subscription.plan?.toLowerCase();
     const monthlyLimit = HS_CODE_LIMITS[plan];
 
-    console.log("PLAN RESOLVED:", plan, "LIMIT:", monthlyLimit);
-
     if (!monthlyLimit) {
       return res.status(403).json({
-        error: "Plan not eligible for HS Code lookup",
+        error: "HS Code lookup is not available on your current plan.",
       });
     }
 
-    // 📅 Start of current month
+    // 📅 Start of current month (UTC)
     const startOfMonth = new Date();
     startOfMonth.setUTCDate(1);
     startOfMonth.setUTCHours(0, 0, 0, 0);
 
+    // 🔍 Count HS Code usage this month
     const { count, error: countError } = await supabase
       .from("hs_code_usage")
       .select("*", { count: "exact", head: true })
       .eq("user_id", userId)
       .gte("created_at", startOfMonth.toISOString());
 
-    console.log("USAGE COUNT:", count, countError);
+    if (countError) {
+      console.error("Usage count failed:", countError.message);
+      return res.status(500).json({
+        error: "Unable to verify HS Code usage",
+      });
+    }
 
+    // ⛔ Limit reached
     if (count >= monthlyLimit) {
       return res.status(429).json({
-        error: "Monthly HS Code limit reached",
+        error:
+          "You have reached your monthly HS Code lookup limit. Please upgrade your plan to continue.",
       });
     }
 
@@ -95,15 +96,19 @@ exports.classifyHSCode = async (req, res) => {
       additional_details || ""
     );
 
-    // 📊 Log usage
-    await supabase.from("hs_code_usage").insert([
-      {
-        user_id: userId,
-        ip_address: req.ip,
-        endpoint: "/api/classify",
-        plan,
-      },
-    ]);
+    // 📊 Log usage (non-blocking)
+    try {
+      await supabase.from("hs_code_usage").insert([
+        {
+          user_id: userId,
+          ip_address: req.ip,
+          endpoint: "/api/classify",
+          plan,
+        },
+      ]);
+    } catch (logError) {
+      console.error("Usage logging failed:", logError.message);
+    }
 
     return res.json({
       hsCode: result.hsCode || result.code || null,
