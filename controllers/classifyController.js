@@ -18,27 +18,32 @@ exports.classifyHSCode = async (req, res) => {
       });
     }
 
-    // 🔐 Base44-provided user identity
+    // 🔐 Base44 user identity
     const userEmail = req.headers["x-user-email"];
 
     if (!userEmail) {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    // 🔍 Look up user in Supabase Auth (ADMIN)
+    // 🔍 Look up user in Supabase Auth (ADMIN, v2-compatible)
     const {
-      data: authUser,
-      error: authError,
-    } = await supabase.auth.admin.getUserByEmail(userEmail);
+      data: userList,
+      error: listError,
+    } = await supabase.auth.admin.listUsers({
+      page: 1,
+      perPage: 1,
+      email: userEmail,
+    });
 
-    if (authError || !authUser?.user) {
-      console.error("Auth user lookup failed:", authError);
+    if (listError || !userList?.users?.length) {
+      console.error("Auth user lookup failed:", listError);
       return res.status(403).json({
         error: "Authenticated user not found",
       });
     }
 
-    const userId = authUser.user.id;
+    const authUser = userList.users[0];
+    const userId = authUser.id;
 
     // 📦 Fetch active subscription
     const { data: subscription, error: subError } = await supabase
